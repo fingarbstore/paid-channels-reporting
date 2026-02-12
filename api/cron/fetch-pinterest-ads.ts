@@ -84,14 +84,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const response = await fetch(url.toString(), {
     headers: { Authorization: `Bearer ${token}` },
   });
-  const json = await response.json() as { items?: PinterestRow[]; message?: string };
+  // The ad_groups/analytics endpoint returns a raw array, not { items: [] }
+  const json = await response.json() as PinterestRow[] | { code?: number; message?: string };
 
   if (!response.ok) {
     console.error('Pinterest API error:', json);
-    return res.status(502).json({ error: json.message ?? 'Pinterest API error' });
+    return res.status(502).json({ error: (json as { message?: string }).message ?? 'Pinterest API error' });
   }
 
-  const items = json.items ?? [];
+  const items: PinterestRow[] = Array.isArray(json) ? json : [];
 
   if (items.length === 0) {
     return res.status(200).json({ ok: true, inserted: 0 });

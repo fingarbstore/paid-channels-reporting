@@ -106,14 +106,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const json = await response.json() as { items?: PinterestRow[]; message?: string };
+    // The ad_groups/analytics endpoint returns a raw array, not { items: [] }
+    const json = await response.json() as PinterestRow[] | { code?: number; message?: string };
 
     if (!response.ok) {
       console.error(`Pinterest error for ${start_date}–${end_date}:`, json);
       continue;
     }
 
-    const rows = (json.items ?? []).map((r) => ({
+    const rows = (Array.isArray(json) ? json : []).map((r) => ({
       date:          r.DATE ?? start_date,
       campaign_name: r.CAMPAIGN_NAME  ?? '',
       ad_group_name: r.AD_GROUP_NAME  ?? null,

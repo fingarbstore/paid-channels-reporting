@@ -1,8 +1,9 @@
 // TEMPORARY DEBUG ENDPOINT — DELETE AFTER USE
 // Diagnoses why Pinterest analytics returns 0 rows.
-// Shows raw listAdGroupIds response and raw analytics response for a given date.
+// Shows raw ad groups list, analytics response for single date, and
+// also tries fetching ALL ad groups including archived ones.
 // Protected by x-ingest-secret header.
-// Usage: GET /api/debug/pinterest?date=2025-01-15
+// Usage: GET /api/debug/pinterest?date=2025-12-01
 //        GET /api/debug/pinterest  (defaults to 7 days ago)
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
@@ -46,7 +47,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // Step 1: get token
     const token = await getAccessToken();
 
-    // Step 2: list ad groups (raw response)
+    // Step 2a: list ad groups — default (active/paused only)
     const adGroupsUrl = new URL(
       `https://api.pinterest.com/v5/ad_accounts/${AD_ACCOUNT_ID}/ad_groups`
     );
@@ -59,15 +60,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       message?: string;
     };
 
-    const adGroupIds = (adGroupsJson.items ?? []).map((g) => g.id);
+    // Step 2b: also try with entity_status=ACTIVE,PAUSED,ARCHIVED to catch all
+    const adGroupsAllUrl = new URL(
+      `https://api.pinterest.com/v5/ad_accounts/${AD_ACCOUNT_ID}/ad_groups`
+    );
+    adGroupsAllUrl.searchParams.set('page_size', '250');
+    adGroupsAllUrl.searchParams.set('entity_statuses', 'ACTIVE,PAUSED,ARCHIVED');
+    const adGroupsAllRes = await fetch(adGroupsAllUrl.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const adGroupsAllJson = await adGroupsAllRes.json() as {
+      items?: Array<{ id: string; name: string; status?: string }>;
+      message?: string;
+    };
 
-    if (adGroupIds.length === 0) {
+    const adGroupIds = (adGroupsJson.items ?? []).map((g) => g.id);
+    const adGroupIdsAll = (adGroupsAllJson.items ?? []).map((g) => g.id);
+
+    // Use the larger set for analytics
+    const idsToUse = adGroupIdsAll.length > adGroupIds.length ? adGroupIdsAll : adGroupIds;
+
+    if (idsToUse.length === 0) {
       return res.status(200).json({
-        ad_account_id: AD_ACCOUNT_ID,
-        ad_groups_status: adGroupsRes.status,
-        ad_groups_raw: adGroupsJson,
-        analytics: null,
-        note: 'No ad group IDs returned — cannot call analytics',
+        ad_account_id:    AD_ACCOUNT_ID,
+        ad_groups_raw:    adGroupsJson,
+        ad_groups_all_raw: adGroupsAllJson,
+        analytics:        null,
+        note:             'No ad group IDs returned from either query — check AD_ACCOUNT_ID env var',
       });
     }
 
@@ -77,7 +96,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     );
     analyticsUrl.searchParams.set('start_date',   dateStr);
     analyticsUrl.searchParams.set('end_date',     dateStr);
-    analyticsUrl.searchParams.set('ad_group_ids', adGroupIds.join(','));
+    analyticsUrl.searchParams.set('ad_group_ids', idsToUse.join(','));
     analyticsUrl.searchParams.set('columns',      'AD_GROUP_NAME,CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICKTHROUGH_1,IMPRESSION_1,TOTAL_CHECKOUT');
     analyticsUrl.searchParams.set('granularity',  'DAY');
 
@@ -86,14 +105,36 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
     const analyticsJson = await analyticsRes.json();
 
+    // Step 4: also try the campaigns analytics endpoint directly
+    const campaignsAnalyticsUrl = new URL(
+      `https://api.pinterest.com/v5/ad_accounts/${AD_ACCOUNT_ID}/campaigns/analytics`
+    );
+    campaignsAnalyticsUrl.searchParams.set('start_date',  dateStr);
+    campaignsAnalyticsUrl.searchParams.set('end_date',    dateStr);
+    campaignsAnalyticsUrl.searchParams.set('columns',     'CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICKTHROUGH_1,IMPRESSION_1,TOTAL_CHECKOUT');
+    campaignsAnalyticsUrl.searchParams.set('granularity', 'DAY');
+
+    const campaignsRes = await fetch(campaignsAnalyticsUrl.toString(), {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const campaignsJson = await campaignsRes.json();
+
     return res.status(200).json({
-      ad_account_id:      AD_ACCOUNT_ID,
-      date_queried:       dateStr,
-      ad_groups_count:    adGroupIds.length,
-      ad_groups_ids:      adGroupIds,
-      ad_groups_names:    (adGroupsJson.items ?? []).map((g) => ({ id: g.id, name: g.name, status: g.status })),
-      analytics_status:   analyticsRes.status,
-      analytics_raw:      analyticsJson,
+      ad_account_id:            AD_ACCOUNT_ID,
+      date_queried:             dateStr,
+      // default ad groups query
+      ad_groups_default_count:  adGroupIds.length,
+      ad_groups_default_names:  (adGroupsJson.items ?? []).map((g) => ({ id: g.id, name: g.name, status: g.status })),
+      // all-status ad groups query
+      ad_groups_all_count:      adGroupIdsAll.length,
+      ad_groups_all_names:      (adGroupsAllJson.items ?? []).map((g) => ({ id: g.id, name: g.name, status: g.status })),
+      // analytics using the larger set
+      analytics_ids_used:       idsToUse.length,
+      analytics_status:         analyticsRes.status,
+      analytics_raw:            analyticsJson,
+      // campaigns-level analytics (no IDs required)
+      campaigns_analytics_status: campaignsRes.status,
+      campaigns_analytics_raw:    campaignsJson,
     });
 
   } catch (err) {

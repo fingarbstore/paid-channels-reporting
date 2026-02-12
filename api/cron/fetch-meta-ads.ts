@@ -17,8 +17,6 @@ const FIELDS = [
   'date_stop',
   'adset_name',
   'campaign_name',
-  'results',
-  'result_indicator',
   'reach',
   'frequency',
   'spend',
@@ -34,8 +32,6 @@ interface MetaInsight {
   date_stop:           string;
   adset_name?:         string;
   campaign_name:       string;
-  results?:            number;
-  result_indicator?:   string;
   reach?:              string;
   frequency?:          string;
   spend?:              string;
@@ -92,8 +88,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     reporting_ends:               r.date_stop,
     adset_name:                   r.adset_name       ?? null,
     campaign_name:                r.campaign_name,
-    results:                      r.results          ?? 0,
-    result_indicator:             r.result_indicator ?? null,
+    results:                      0,
+    result_indicator:             null,
     reach:                        parseInt(r.reach   ?? '0', 10) || 0,
     frequency:                    parseFloat(r.frequency ?? '0') || 0,
     amount_spent:                 parseFloat(r.spend ?? '0')     || 0,

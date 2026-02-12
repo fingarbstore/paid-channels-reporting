@@ -5,13 +5,12 @@ import { getVercelOidcToken } from '@vercel/oidc';
 // Uses Vercel OIDC + Google Workload Identity Federation.
 // No service account key file required — avoids iam.disableServiceAccountKeyCreation org policy.
 // Each invocation exchanges a short-lived Vercel OIDC token for GCP credentials.
-// No service_account_impersonation_url — the federated identity accesses BigQuery
-// directly via the STS token. BigQuery roles are granted to the principal at project level.
 const authClient = ExternalAccountClient.fromJSON({
   type: 'external_account',
   audience: `//iam.googleapis.com/projects/${process.env.GCP_PROJECT_NUMBER}/locations/global/workloadIdentityPools/${process.env.GCP_WORKLOAD_IDENTITY_POOL_ID}/providers/${process.env.GCP_WORKLOAD_IDENTITY_POOL_PROVIDER_ID}`,
   subject_token_type: 'urn:ietf:params:oauth:token-type:jwt',
   token_url: 'https://sts.googleapis.com/v1/token',
+  service_account_impersonation_url: `https://iamcredentials.googleapis.com/v1/projects/-/serviceAccounts/${process.env.GCP_SERVICE_ACCOUNT_EMAIL}:generateAccessToken`,
   subject_token_supplier: {
     getSubjectToken: () => getVercelOidcToken(),
   },

@@ -1,13 +1,13 @@
 // ============================================================
 // GET /api/cron/fetch-pinterest-ads
 // Vercel Cron: runs daily at 02:00 UTC
-// Fetches yesterday's data from Pinterest Ads API and streams
-// it into BigQuery raw_pinterest_ads table.
+// Fetches yesterday's data from Pinterest Ads API and inserts
+// it into BigQuery raw_pinterest_ads table via load job.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateCronSecret } from '../../lib/auth';
-import { dataset } from '../../lib/bigquery';
+import { loadIntoBigQuery } from '../../lib/bigquery';
 
 const AD_ACCOUNT_ID = process.env.PINTEREST_AD_ACCOUNT_ID!;
 const APP_ID        = process.env.PINTEREST_APP_ID!;
@@ -88,10 +88,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }));
 
   try {
-    await dataset.table('raw_pinterest_ads').insert(records);
+    await loadIntoBigQuery('raw_pinterest_ads', records);
   } catch (err: unknown) {
-    const details = (err as { errors?: unknown }).errors ?? err;
-    console.error('BigQuery insert error:', details);
+    console.error('BigQuery load job error:', err);
     return res.status(500).json({ error: String(err) });
   }
 

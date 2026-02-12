@@ -1,13 +1,13 @@
 // ============================================================
 // GET /api/backfill/meta?from=2023-01-01&to=2025-01-01
 // Manually triggered backfill for Meta Ads.
-// Fetches data in weekly chunks and streams into BigQuery.
+// Fetches data in weekly chunks and inserts into BigQuery via load jobs.
 // Protected by x-ingest-secret header.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateIngestSecret } from '../../lib/auth';
-import { dataset } from '../../lib/bigquery';
+import { loadIntoBigQuery } from '../../lib/bigquery';
 
 const AD_ACCOUNT_ID = process.env.META_AD_ACCOUNT_ID!;
 const ACCESS_TOKEN  = process.env.META_ACCESS_TOKEN!;
@@ -124,12 +124,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }));
 
     try {
-      await dataset.table('raw_meta_ads').insert(records);
+      await loadIntoBigQuery('raw_meta_ads', records);
       total += records.length;
-      console.log(`Inserted ${records.length} rows for ${since}–${until}`);
+      console.log(`Loaded ${records.length} rows for ${since}–${until}`);
     } catch (err: unknown) {
-      const details = (err as { errors?: unknown }).errors ?? err;
-      console.error(`BigQuery insert error for ${since}–${until}:`, details);
+      console.error(`BigQuery load job error for ${since}–${until}:`, err);
     }
   }
 

@@ -1,13 +1,13 @@
 // ============================================================
 // GET /api/cron/fetch-meta-ads
 // Vercel Cron: runs daily at 02:00 UTC
-// Fetches yesterday's data from Meta Marketing API and streams
-// it into BigQuery raw_meta_ads table.
+// Fetches yesterday's data from Meta Marketing API and inserts
+// it into BigQuery raw_meta_ads table via load job.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateCronSecret } from '../../lib/auth';
-import { dataset } from '../../lib/bigquery';
+import { loadIntoBigQuery } from '../../lib/bigquery';
 
 const AD_ACCOUNT_ID  = process.env.META_AD_ACCOUNT_ID!;
 const ACCESS_TOKEN   = process.env.META_ACCESS_TOKEN!;
@@ -106,10 +106,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }));
 
   try {
-    await dataset.table('raw_meta_ads').insert(records);
+    await loadIntoBigQuery('raw_meta_ads', records);
   } catch (err: unknown) {
-    const details = (err as { errors?: unknown }).errors ?? err;
-    console.error('BigQuery insert error:', details);
+    console.error('BigQuery load job error:', err);
     return res.status(500).json({ error: String(err) });
   }
 

@@ -1,13 +1,13 @@
 // ============================================================
 // POST /api/ingest/google-ads
 // Called by the Google Ads Script (daily-ingest.js and backfill.js).
-// Receives an array of rows and streams them into BigQuery.
+// Receives an array of rows and inserts them into BigQuery via load job.
 // Protected by x-ingest-secret header.
 // ============================================================
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateIngestSecret } from '../../lib/auth';
-import { dataset } from '../../lib/bigquery';
+import { loadIntoBigQuery } from '../../lib/bigquery';
 
 interface GoogleAdsRow {
   date: string;
@@ -49,10 +49,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }));
 
   try {
-    await dataset.table('raw_google_ads').insert(records);
+    await loadIntoBigQuery('raw_google_ads', records);
   } catch (err: unknown) {
-    const details = (err as { errors?: unknown }).errors ?? err;
-    console.error('BigQuery insert error:', details);
+    console.error('BigQuery load job error:', err);
     return res.status(500).json({ error: String(err) });
   }
 

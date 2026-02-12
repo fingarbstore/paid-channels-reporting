@@ -7,7 +7,7 @@
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { validateIngestSecret } from '../../lib/auth';
-import { dataset } from '../../lib/bigquery';
+import { loadIntoBigQuery } from '../../lib/bigquery';
 
 const AD_ACCOUNT_ID = process.env.PINTEREST_AD_ACCOUNT_ID!;
 const APP_ID        = process.env.PINTEREST_APP_ID!;
@@ -105,12 +105,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (rows.length === 0) continue;
 
     try {
-      await dataset.table('raw_pinterest_ads').insert(rows);
+      await loadIntoBigQuery('raw_pinterest_ads', rows);
       total += rows.length;
-      console.log(`Inserted ${rows.length} rows for ${start_date}–${end_date}`);
+      console.log(`Loaded ${rows.length} rows for ${start_date}–${end_date}`);
     } catch (err: unknown) {
-      const details = (err as { errors?: unknown }).errors ?? err;
-      console.error(`BigQuery insert error for ${start_date}–${end_date}:`, details);
+      console.error(`BigQuery load job error for ${start_date}–${end_date}:`, err);
     }
   }
 

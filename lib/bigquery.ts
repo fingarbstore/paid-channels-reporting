@@ -1,4 +1,5 @@
 import { BigQuery } from '@google-cloud/bigquery';
+import { Readable } from 'stream';
 import { getVercelOidcToken } from '@vercel/oidc';
 
 // Manual Workload Identity Federation auth — bypasses google-auth-library
@@ -81,3 +82,29 @@ export const bigquery = new BigQuery({
 });
 
 export const dataset = bigquery.dataset(process.env.BIGQUERY_DATASET_ID!);
+
+// ---------------------------------------------------------------------------
+// loadIntoBigQuery — free-tier compatible batch insert via load job.
+// Uses NEWLINE_DELIMITED_JSON source format streamed from an in-memory buffer.
+// This is equivalent to the old `table.insert()` streaming API but works on
+// the BigQuery free tier (streaming inserts are a paid feature).
+// ---------------------------------------------------------------------------
+export async function loadIntoBigQuery(
+  tableName: string,
+  records: Record<string, unknown>[],
+): Promise<void> {
+  const ndjson = records.map((r) => JSON.stringify(r)).join('\n');
+  const stream = Readable.from([ndjson]);
+
+  const table = dataset.table(tableName);
+  const [job] = await table.load(stream, {
+    sourceFormat:      'NEWLINE_DELIMITED_JSON',
+    writeDisposition:  'WRITE_APPEND',
+    createDisposition: 'CREATE_NEVER', // table must already exist
+  });
+
+  const errors = job.status?.errors;
+  if (errors && errors.length > 0) {
+    throw new Error(`BigQuery load job errors: ${JSON.stringify(errors)}`);
+  }
+}

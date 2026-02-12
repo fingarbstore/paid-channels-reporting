@@ -33,13 +33,13 @@ async function getAccessToken(): Promise<string> {
 interface PinterestAdGroup { id: string; name: string; }
 
 interface PinterestRow {
-  DATE?:                  string;
-  AD_GROUP_NAME:          string;
-  CAMPAIGN_NAME:          string;
-  SPEND_IN_MICRO_DOLLAR:  string | number;
-  CLICK_1:                string | number;
-  IMPRESSION_1:           string | number;
-  TOTAL_ORDER_QUANTITY:   string | number;
+  DATE?:                 string;
+  AD_GROUP_NAME:         string;
+  CAMPAIGN_NAME:         string;
+  SPEND_IN_MICRO_DOLLAR: string | number;
+  CLICKTHROUGH_1:        string | number;
+  IMPRESSION_1:          string | number;
+  TOTAL_CHECKOUT:        string | number;
 }
 
 async function listAdGroupIds(token: string): Promise<string[]> {
@@ -100,7 +100,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     url.searchParams.set('start_date',   start_date);
     url.searchParams.set('end_date',     end_date);
     url.searchParams.set('ad_group_ids', adGroupIds.join(','));
-    url.searchParams.set('columns',      'AD_GROUP_NAME,CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICK_1,IMPRESSION_1,TOTAL_ORDER_QUANTITY');
+    url.searchParams.set('columns',      'AD_GROUP_NAME,CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICKTHROUGH_1,IMPRESSION_1,TOTAL_CHECKOUT');
     url.searchParams.set('granularity',  'DAY');
 
     const response = await fetch(url.toString(), {
@@ -118,9 +118,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       campaign_name: r.CAMPAIGN_NAME  ?? '',
       ad_group_name: r.AD_GROUP_NAME  ?? null,
       spend:         (Number(r.SPEND_IN_MICRO_DOLLAR) || 0) / 1_000_000,
-      clicks:        Number(r.CLICK_1)              || 0,
+      clicks:        Number(r.CLICKTHROUGH_1)       || 0,
       impressions:   Number(r.IMPRESSION_1)         || 0,
-      orders:        Number(r.TOTAL_ORDER_QUANTITY) || 0,
+      orders:        Number(r.TOTAL_CHECKOUT)       || 0,
       revenue:       0,
     }));
 

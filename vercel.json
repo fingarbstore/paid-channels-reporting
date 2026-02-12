@@ -1,0 +1,7 @@
+{
+  "buildCommand": "npm run build",
+  "crons": [
+    { "path": "/api/cron/fetch-meta-ads",      "schedule": "0 2 * * *" },
+    { "path": "/api/cron/fetch-pinterest-ads", "schedule": "0 2 * * *" }
+  ]
+}

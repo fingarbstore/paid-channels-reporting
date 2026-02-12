@@ -30,6 +30,8 @@ async function getAccessToken(): Promise<string> {
   return data.access_token;
 }
 
+interface PinterestAdGroup { id: string; name: string; }
+
 interface PinterestRow {
   DATE?:                  string;
   AD_GROUP_NAME:          string;
@@ -38,6 +40,18 @@ interface PinterestRow {
   CLICK_1:                string | number;
   IMPRESSION_1:           string | number;
   TOTAL_ORDER_QUANTITY:   string | number;
+}
+
+async function listAdGroupIds(token: string): Promise<string[]> {
+  const url = new URL(
+    `https://api.pinterest.com/v5/ad_accounts/${AD_ACCOUNT_ID}/ad_groups`
+  );
+  url.searchParams.set('page_size', '250');
+  const res = await fetch(url.toString(), {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const data = await res.json() as { items?: PinterestAdGroup[] };
+  return (data.items ?? []).map((g) => g.id);
 }
 
 function getWeeklyChunks(from: string, to: string) {
@@ -69,6 +83,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const to = (req.query.to as string) ?? new Date().toISOString().split('T')[0];
 
   const token = await getAccessToken();
+
+  // Fetch all ad group IDs once (analytics endpoint requires explicit IDs)
+  const adGroupIds = await listAdGroupIds(token);
+  if (adGroupIds.length === 0) {
+    return res.status(200).json({ ok: true, total: 0 });
+  }
+
   const chunks = getWeeklyChunks(from, to);
   let total = 0;
 
@@ -76,10 +97,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const url = new URL(
       `https://api.pinterest.com/v5/ad_accounts/${AD_ACCOUNT_ID}/ad_groups/analytics`
     );
-    url.searchParams.set('start_date',  start_date);
-    url.searchParams.set('end_date',    end_date);
-    url.searchParams.set('columns',     'AD_GROUP_NAME,CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICK_1,IMPRESSION_1,TOTAL_ORDER_QUANTITY');
-    url.searchParams.set('granularity', 'DAY');
+    url.searchParams.set('start_date',   start_date);
+    url.searchParams.set('end_date',     end_date);
+    url.searchParams.set('ad_group_ids', adGroupIds.join(','));
+    url.searchParams.set('columns',      'AD_GROUP_NAME,CAMPAIGN_NAME,SPEND_IN_MICRO_DOLLAR,CLICK_1,IMPRESSION_1,TOTAL_ORDER_QUANTITY');
+    url.searchParams.set('granularity',  'DAY');
 
     const response = await fetch(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },

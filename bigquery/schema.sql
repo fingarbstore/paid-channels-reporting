@@ -147,7 +147,7 @@ VALUES
 -- Audience type via adset_name (adset_keyword column — primary lookup)
 ('meta', NULL, '\\|retargeting\\|',     NULL, NULL, NULL, 'retargeting',  22),
 ('meta', NULL, '\\|prospecting\\|',     NULL, NULL, NULL, 'prospecting',  22),
-('meta', NULL, '\\|catalogue sales\\|', NULL, NULL, NULL, 'retargeting',  22),
+('meta', NULL, '\\|catalogue sales\\|', NULL, NULL, NULL, 'prospecting',  22),  -- TDR = in-house brand, broad targeting
 ('meta', NULL, '\\|testing\\|',         NULL, NULL, NULL, 'prospecting',  22),
 ('meta', NULL, '\\|whitelisting\\|',    NULL, NULL, NULL, 'prospecting',  22),
 ('meta', NULL, '\\|engagement\\|',      NULL, NULL, NULL, 'prospecting',  22),
